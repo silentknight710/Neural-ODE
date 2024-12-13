@@ -1,0 +1,26 @@
+import torch
+from torchdiffeq import odeint
+
+def reverse_mode_derivative(f, z_t1, dL_dz_t1, t0, t1, theta):
+    """
+    Computes the reverse-mode derivative of an ODE initial value problem.
+
+    Parameters:
+        f: Callable representing the ODE dynamics, f(z, t, theta).
+        z_t1: Final state at time t1.
+        dL_dz_t1: Gradient of the loss with respect to z(t1).
+        t0: Start time.
+        t1: Stop time.
+        theta: Dynamics parameters.
+
+    Returns:
+        Gradients with respect to z(t0) and theta.
+    """
+    # Define initial augmented state
+    s0 = torch.cat([z_t1, dL_dz_t1, torch.zeros_like(theta)])
+
+    def aug_dynamics(s, t):
+        """Defines the augmented dynamics for reverse-mode computation."""
+        z, adj_z, adj_theta = torch.split(s, [z_t1.shape[0], z_t1.shape[0], theta.shape[0]])
+        dz_dt = f(z, t, theta)
+        vjp_z = torch.autograd.grad(dz_dt, z, grad_outputs=adj_z, retain_graph=True)[0]
